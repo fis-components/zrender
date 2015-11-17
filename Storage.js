@@ -152,19 +152,19 @@ Storage.prototype._updateAndAddShape = function (el, clipShapes) {
         return;
     }
     el.updateTransform();
-    if (el.type == 'group') {
-        if (el.clipShape) {
-            // clipShape 的变换是基于 group 的变换
-            el.clipShape.parent = el;
-            el.clipShape.updateTransform();
-            // PENDING 效率影响
-            if (clipShapes) {
-                clipShapes = clipShapes.slice();
-                clipShapes.push(el.clipShape);
-            } else {
-                clipShapes = [el.clipShape];
-            }
+    if (el.clipShape) {
+        // clipShape 的变换是基于 group 的变换
+        el.clipShape.parent = el;
+        el.clipShape.updateTransform();
+        // PENDING 效率影响
+        if (clipShapes) {
+            clipShapes = clipShapes.slice();
+            clipShapes.push(el.clipShape);
+        } else {
+            clipShapes = [el.clipShape];
         }
+    }
+    if (el.type == 'group') {
         for (var i = 0; i < el._children.length; i++) {
             var child = el._children[i];
             // Force to mark as dirty if group is dirty
@@ -181,21 +181,23 @@ Storage.prototype._updateAndAddShape = function (el, clipShapes) {
 /**
          * 修改图形(Shape)或者组(Group)
          * 
-         * @param {string} elId 唯一标识
+         * @param {string|module:zrender/shape/Base|module:zrender/Group} el
          * @param {Object} [params] 参数
          */
-Storage.prototype.mod = function (elId, params) {
-    var el = this._elements[elId];
+Storage.prototype.mod = function (el, params) {
+    if (typeof el === 'string') {
+        el = this._elements[el];
+    }
     if (el) {
         el.modSelf();
         if (params) {
             // 如果第二个参数直接使用 shape
-            // parent, _storage, __startClip 三个属性会有循环引用
+            // parent, _storage, __clipShapes 三个属性会有循环引用
             // 主要为了向 1.x 版本兼容，2.x 版本不建议使用第二个参数
-            if (params.parent || params._storage || params.__startClip) {
+            if (params.parent || params._storage || params.__clipShapes) {
                 var target = {};
                 for (var name in params) {
-                    if (name == 'parent' || name == '_storage' || name == '__startClip') {
+                    if (name === 'parent' || name === '_storage' || name === '__clipShapes') {
                         continue;
                     }
                     if (params.hasOwnProperty(name)) {
@@ -260,6 +262,10 @@ Storage.prototype.hasHoverShape = function () {
          * @param {module:zrender/shape/Shape|module:zrender/Group} el
          */
 Storage.prototype.addRoot = function (el) {
+    // Element has been added
+    if (this._elements[el.id]) {
+        return;
+    }
     if (el instanceof Group) {
         el.addChildrenToStorage(this);
     }
@@ -268,7 +274,7 @@ Storage.prototype.addRoot = function (el) {
 };
 /**
          * 删除指定的图形(Shape)或者组(Group)
-         * @param  {string|Array.<string>} [elId] 如果为空清空整个Storage
+         * @param {string|Array.<string>} [elId] 如果为空清空整个Storage
          */
 Storage.prototype.delRoot = function (elId) {
     if (typeof elId == 'undefined') {

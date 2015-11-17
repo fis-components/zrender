@@ -66,9 +66,15 @@ Animation.prototype = {
              * @param {module:zrender/animation/Clip} clip
              */
     remove: function (clip) {
-        var idx = util.indexOf(this._clips, clip);
-        if (idx >= 0) {
-            this._clips.splice(idx, 1);
+        if (clip.__inStep) {
+            // 如果是在 step 中，不能直接移除
+            // 需要标记为 needsRemove 然后在所有 clip step 完成后移除
+            clip.__needsRemove = true;
+        } else {
+            var idx = util.indexOf(this._clips, clip);
+            if (idx >= 0) {
+                this._clips.splice(idx, 1);
+            }
         }
     },
     _update: function () {
@@ -80,7 +86,9 @@ Animation.prototype = {
         var deferredClips = [];
         for (var i = 0; i < len; i++) {
             var clip = clips[i];
+            clip.__inStep = true;
             var e = clip.step(time);
+            clip.__inStep = false;
             // Throw out the events need to be called after
             // stage.update, like destroy
             if (e) {
@@ -88,12 +96,9 @@ Animation.prototype = {
                 deferredClips.push(clip);
             }
         }
-        if (this.stage.update) {
-            this.stage.update();
-        }
         // Remove the finished clip
         for (var i = 0; i < len;) {
-            if (clips[i]._needsRemove) {
+            if (clips[i].__needsRemove) {
                 clips[i] = clips[len - 1];
                 clips.pop();
                 len--;
@@ -108,6 +113,9 @@ Animation.prototype = {
         this._time = time;
         this.onframe(delta);
         this.dispatch('frame', delta);
+        if (this.stage.update) {
+            this.stage.update();
+        }
     },
     /**
              * 开始运行动画
@@ -117,8 +125,8 @@ Animation.prototype = {
         this._running = true;
         function step() {
             if (self._running) {
-                self._update();
                 requestAnimationFrame(step);
+                self._update();
             }
         }
         this._time = new Date().getTime();

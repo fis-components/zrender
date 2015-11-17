@@ -6,6 +6,7 @@
  *
  */
 // TODO mouseover 只触发一次
+// 目前的高亮因为每次都需要 addHover 所以不能只是开始的时候触发一次
 
 
 'use strict';
@@ -30,6 +31,16 @@ var domHandlerNames = [
     'touchend',
     'touchmove'
 ];
+var isZRenderElement = function (event) {
+    // 暂时忽略 IE8-
+    if (window.G_vmlCanvasManager) {
+        return true;
+    }
+    event = event || window.event;
+    // 进入对象优先~
+    var target = event.toElement || event.relatedTarget || event.srcElement || event.target;
+    return target && target.className.match(config.elementClassName);
+};
 var domHandlers = {
     /**
              * 窗口大小改变响应函数
@@ -48,7 +59,10 @@ var domHandlers = {
              * @inner
              * @param {Event} event
              */
-    click: function (event) {
+    click: function (event, manually) {
+        if (!isZRenderElement(event) && !manually) {
+            return;
+        }
         event = this._zrenderEventFixed(event);
         // 分发config.EVENT.CLICK事件
         var _lastHover = this._lastHover;
@@ -65,7 +79,10 @@ var domHandlers = {
              * @inner
              * @param {Event} event
              */
-    dblclick: function (event) {
+    dblclick: function (event, manually) {
+        if (!isZRenderElement(event) && !manually) {
+            return;
+        }
         event = event || window.event;
         event = this._zrenderEventFixed(event);
         // 分发config.EVENT.DBLCLICK事件
@@ -83,38 +100,39 @@ var domHandlers = {
              * @inner
              * @param {Event} event
              */
-    mousewheel: function (event) {
+    mousewheel: function (event, manually) {
+        if (!isZRenderElement(event) && !manually) {
+            return;
+        }
         event = this._zrenderEventFixed(event);
         // http://www.sitepoint.com/html5-javascript-mouse-wheel/
         // https://developer.mozilla.org/en-US/docs/DOM/DOM_event_reference/mousewheel
         var delta = event.wheelDelta || -event.detail;
         // Firefox
         var scale = delta > 0 ? 1.1 : 1 / 1.1;
-        var layers = this.painter.getLayers();
         var needsRefresh = false;
-        for (var z in layers) {
-            if (z !== 'hover') {
-                var layer = layers[z];
-                var pos = layer.position;
-                if (layer.zoomable) {
-                    layer.__zoom = layer.__zoom || 1;
-                    var newZoom = layer.__zoom;
-                    newZoom *= scale;
-                    newZoom = Math.max(Math.min(layer.maxZoom, newZoom), layer.minZoom);
-                    scale = newZoom / layer.__zoom;
-                    layer.__zoom = newZoom;
-                    // Keep the mouse center when scaling
-                    pos[0] -= (this._mouseX - pos[0]) * (scale - 1);
-                    pos[1] -= (this._mouseY - pos[1]) * (scale - 1);
-                    layer.scale[0] *= scale;
-                    layer.scale[1] *= scale;
-                    layer.dirty = true;
-                    needsRefresh = true;
-                    // Prevent browser default scroll action 
-                    eventTool.stop(event);
-                }
+        var mouseX = this._mouseX;
+        var mouseY = this._mouseY;
+        this.painter.eachBuildinLayer(function (layer) {
+            var pos = layer.position;
+            if (layer.zoomable) {
+                layer.__zoom = layer.__zoom || 1;
+                var newZoom = layer.__zoom;
+                newZoom *= scale;
+                newZoom = Math.max(Math.min(layer.maxZoom, newZoom), layer.minZoom);
+                scale = newZoom / layer.__zoom;
+                layer.__zoom = newZoom;
+                // Keep the mouse center when scaling
+                pos[0] -= (mouseX - pos[0]) * (scale - 1);
+                pos[1] -= (mouseY - pos[1]) * (scale - 1);
+                layer.scale[0] *= scale;
+                layer.scale[1] *= scale;
+                layer.dirty = true;
+                needsRefresh = true;
+                // Prevent browser default scroll action 
+                eventTool.stop(event);
             }
-        }
+        });
         if (needsRefresh) {
             this.painter.refresh();
         }
@@ -127,12 +145,13 @@ var domHandlers = {
              * @inner
              * @param {Event} event
              */
-    mousemove: function (event) {
+    mousemove: function (event, manually) {
+        if (!isZRenderElement(event) && !manually) {
+            return;
+        }
         if (this.painter.isLoading()) {
             return;
         }
-        // 拖拽不触发click事件
-        this._clickThreshold++;
         event = this._zrenderEventFixed(event);
         this._lastX = this._mouseX;
         this._lastY = this._mouseY;
@@ -168,24 +187,22 @@ var domHandlers = {
             this.storage.drift(this._draggingTarget.id, dx, dy);
             this._draggingTarget.modSelf();
             this.storage.addHover(this._draggingTarget);
+            // 拖拽不触发click事件
+            this._clickThreshold++;
         } else if (this._isMouseDown) {
-            // Layer dragging
-            var layers = this.painter.getLayers();
             var needsRefresh = false;
-            for (var z in layers) {
-                if (z !== 'hover') {
-                    var layer = layers[z];
-                    if (layer.panable) {
-                        // PENDING
-                        cursor = 'move';
-                        // Keep the mouse center when scaling
-                        layer.position[0] += dx;
-                        layer.position[1] += dy;
-                        needsRefresh = true;
-                        layer.dirty = true;
-                    }
+            // Layer dragging
+            this.painter.eachBuildinLayer(function (layer) {
+                if (layer.panable) {
+                    // PENDING
+                    cursor = 'move';
+                    // Keep the mouse center when scaling
+                    layer.position[0] += dx;
+                    layer.position[1] += dy;
+                    needsRefresh = true;
+                    layer.dirty = true;
                 }
-            }
+            });
             if (needsRefresh) {
                 this.painter.refresh();
             }
@@ -207,7 +224,10 @@ var domHandlers = {
              * @inner
              * @param {Event} event
              */
-    mouseout: function (event) {
+    mouseout: function (event, manually) {
+        if (!isZRenderElement(event) && !manually) {
+            return;
+        }
         event = this._zrenderEventFixed(event);
         var element = event.toElement || event.relatedTarget;
         if (element != this.root) {
@@ -237,7 +257,10 @@ var domHandlers = {
              * @inner
              * @param {Event} event
              */
-    mousedown: function (event) {
+    mousedown: function (event, manually) {
+        if (!isZRenderElement(event) && !manually) {
+            return;
+        }
         // 重置 clickThreshold
         this._clickThreshold = 0;
         if (this._lastDownButton == 2) {
@@ -259,11 +282,13 @@ var domHandlers = {
              * @inner
              * @param {Event} event
              */
-    mouseup: function (event) {
+    mouseup: function (event, manually) {
+        if (!isZRenderElement(event) && !manually) {
+            return;
+        }
         event = this._zrenderEventFixed(event);
         this.root.style.cursor = 'default';
         this._isMouseDown = 0;
-        this._clickThreshold = 0;
         this._mouseDownTarget = null;
         // 分发config.EVENT.MOUSEUP事件
         this._dispatchAgency(this._lastHover, EVENT.MOUSEUP, event);
@@ -275,12 +300,15 @@ var domHandlers = {
              * @inner
              * @param {Event} event
              */
-    touchstart: function (event) {
+    touchstart: function (event, manually) {
+        if (!isZRenderElement(event) && !manually) {
+            return;
+        }
         // eventTool.stop(event);// 阻止浏览器默认事件，重要
         event = this._zrenderEventFixed(event, true);
         this._lastTouchMoment = new Date();
         // 平板补充一次findHover
-        this._mobildFindFixed(event);
+        this._mobileFindFixed(event);
         this._mousedownHandler(event);
     },
     /**
@@ -288,7 +316,10 @@ var domHandlers = {
              * @inner
              * @param {Event} event
              */
-    touchmove: function (event) {
+    touchmove: function (event, manually) {
+        if (!isZRenderElement(event) && !manually) {
+            return;
+        }
         event = this._zrenderEventFixed(event, true);
         this._mousemoveHandler(event);
         if (this._isDragging) {
@@ -300,13 +331,16 @@ var domHandlers = {
              * @inner
              * @param {Event} event
              */
-    touchend: function (event) {
+    touchend: function (event, manually) {
+        if (!isZRenderElement(event) && !manually) {
+            return;
+        }
         // eventTool.stop(event);// 阻止浏览器默认事件，重要
         event = this._zrenderEventFixed(event, true);
         this._mouseupHandler(event);
         var now = new Date();
         if (now - this._lastTouchMoment < EVENT.touchClickDelay) {
-            this._mobildFindFixed(event);
+            this._mobileFindFixed(event);
             this._clickHandler(event);
             if (now - this._lastClickMoment < EVENT.touchClickDelay / 2) {
                 this._dblclickHandler(event);
@@ -327,16 +361,16 @@ var domHandlers = {
          * @param {Object} context 运行时this环境
          * @return {Function}
          */
-function bind1Arg(handler, context) {
-    return function (e) {
-        return handler.call(context, e);
+// function bind1Arg(handler, context) {
+//     return function (e) {
+//         return handler.call(context, e);
+//     };
+// }
+function bind2Arg(handler, context) {
+    return function (arg1, arg2) {
+        return handler.call(context, arg1, arg2);
     };
 }
-/**function bind2Arg(handler, context) {
-            return function (arg1, arg2) {
-                return handler.call(context, arg1, arg2);
-            };
-        }*/
 function bind3Arg(handler, context) {
     return function (arg1, arg2, arg3) {
         return handler.call(context, arg1, arg2, arg3);
@@ -352,7 +386,7 @@ function initDomHandler(instance) {
     var len = domHandlerNames.length;
     while (len--) {
         var name = domHandlerNames[len];
-        instance['_' + name + 'Handler'] = bind1Arg(domHandlers[name], instance);
+        instance['_' + name + 'Handler'] = bind2Arg(domHandlers[name], instance);
     }
 }
 /**
@@ -418,9 +452,10 @@ var Handler = function (root, storage, painter) {
          * 自定义事件绑定
          * @param {string} eventName 事件名称，resize，hover，drag，etc~
          * @param {Function} handler 响应函数
+         * @param {Object} [context] 响应函数
          */
-Handler.prototype.on = function (eventName, handler) {
-    this.bind(eventName, handler);
+Handler.prototype.on = function (eventName, handler, context) {
+    this.bind(eventName, handler, context);
     return this;
 };
 /**
@@ -447,7 +482,7 @@ Handler.prototype.trigger = function (eventName, eventArgs) {
     case EVENT.MOUSEDOWN:
     case EVENT.MOUSEUP:
     case EVENT.MOUSEOUT:
-        this['_' + eventName + 'Handler'](eventArgs);
+        this['_' + eventName + 'Handler'](eventArgs, true);
         break;
     }
 };
@@ -632,9 +667,19 @@ Handler.prototype._dispatchAgency = function (targetShape, eventName, event, dra
         }
     } else if (!draggedShape) {
         // 无hover目标，无拖拽对象，原生事件分发
-        this.dispatch(eventName, {
+        var eveObj = {
             type: eventName,
             event: event
+        };
+        this.dispatch(eventName, eveObj);
+        // 分发事件到用户自定义层
+        this.painter.eachOtherLayer(function (layer) {
+            if (typeof layer[eventHandler] == 'function') {
+                layer[eventHandler](eveObj);
+            }
+            if (layer.dispatch) {
+                layer.dispatch(eventName, eveObj);
+            }
         });
     }
 };
@@ -681,7 +726,7 @@ var MOBILE_TOUCH_OFFSETS = [
     { y: -20 }
 ];
 // touch有指尖错觉，四向尝试，让touch上的点击更好触发事件
-Handler.prototype._mobildFindFixed = function (event) {
+Handler.prototype._mobileFindFixed = function (event) {
     this._lastHover = null;
     this._mouseX = event.zrenderX;
     this._mouseY = event.zrenderY;
@@ -690,7 +735,7 @@ Handler.prototype._mobildFindFixed = function (event) {
     for (var i = 0; !this._lastHover && i < MOBILE_TOUCH_OFFSETS.length; i++) {
         var offset = MOBILE_TOUCH_OFFSETS[i];
         offset.x && (this._mouseX += offset.x);
-        offset.y && (this._mouseX += offset.y);
+        offset.y && (this._mouseY += offset.y);
         this._iterateAndFindHover();
     }
     if (this._lastHover) {
@@ -761,7 +806,7 @@ Handler.prototype._zrenderEventFixed = function (event, isTouch) {
     } else {
         var touch = event.type != 'touchend' ? event.targetTouches[0] : event.changedTouches[0];
         if (touch) {
-            var rBounding = this.root.getBoundingClientRect();
+            var rBounding = this.painter._domRoot.getBoundingClientRect();
             // touch事件坐标是全屏的~
             event.zrenderX = touch.clientX - rBounding.left;
             event.zrenderY = touch.clientY - rBounding.top;

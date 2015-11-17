@@ -72,6 +72,8 @@ Circle.prototype = {
              * @param {module:zrender/shape/Circle~ICircleStyle} style
              */
     buildPath: function (ctx, style) {
+        // Better stroking in ShapeBundle
+        ctx.moveTo(style.x + style.r, style.y);
         ctx.arc(style.x, style.y, style.r, 0, Math.PI * 2, true);
         return;
     },

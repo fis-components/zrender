@@ -49,7 +49,7 @@
 'use strict';
 var Base = require('./Base');
 var PathProxy = require('./util/PathProxy');
-var area = require('zrender/tool/area');
+var area = require('../tool/area');
 /**
          * @alias module:zrender/shape/Droplet
          * @constructor
@@ -99,11 +99,10 @@ Droplet.prototype = {
         return this._pathProxy.fastBoundingRect();
     },
     isCover: function (x, y) {
-        var originPos = this.getTansform(x, y);
+        var originPos = this.transformCoordToLocal(x, y);
         x = originPos[0];
         y = originPos[1];
-        var rect = this.getRect(this.style);
-        if (x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height) {
+        if (this.isCoverRect(x, y)) {
             return area.isInsidePath(this._pathProxy.pathCommands, this.style.lineWidth, this.style.brushType, x, y);
         }
     }

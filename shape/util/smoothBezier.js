@@ -43,7 +43,7 @@ module.exports = function (points, smooth, isLoop, constraint) {
             nextPoint = points[(i + 1) % len];
         } else {
             if (i === 0 || i === len - 1) {
-                cps.push(points[i]);
+                cps.push(vector.clone(points[i]));
                 continue;
             } else {
                 prevPoint = points[i - 1];
@@ -74,7 +74,7 @@ module.exports = function (points, smooth, isLoop, constraint) {
         cps.push(cp1);
     }
     if (isLoop) {
-        cps.push(cps.shift());
+        cps.push(vector.clone(cps.shift()));
     }
     return cps;
 } || module.exports;;

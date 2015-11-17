@@ -1,14 +1,14 @@
 /**
- * zrender: 公共辅助函数
- *
+ * @module zrender/tool/util
  * @author Kener (@Kener-林峰, kener.linfeng@gmail.com)
- *
- * clone：深度克隆
- * merge：合并源对象的属性到目标对象
- * getContext：获取一个自由使用的canvas 2D context，使用原生方法，如isPointInPath，measureText等
+ *         Yi Shen(https://github.com/pissang)
  */
 
 
+var ArrayProto = Array.prototype;
+var nativeForEach = ArrayProto.forEach;
+var nativeMap = ArrayProto.map;
+var nativeFilter = ArrayProto.filter;
 // 用于处理merge时无法遍历Date等对象的问题
 var BUILTIN_OBJECT = {
     '[object Function]': 1,
@@ -17,11 +17,15 @@ var BUILTIN_OBJECT = {
     '[object Error]': 1,
     '[object CanvasGradient]': 1
 };
+var objToString = Object.prototype.toString;
+function isDom(obj) {
+    return obj && obj.nodeType === 1 && typeof obj.nodeName == 'string';
+}
 /**
          * 对一个object进行深度拷贝
-         *
-         * @param {Any} source 需要进行拷贝的对象
-         * @return {Any} 拷贝后的新对象
+         * @memberOf module:zrender/tool/util
+         * @param {*} source 需要进行拷贝的对象
+         * @return {*} 拷贝后的新对象
          */
 function clone(source) {
     if (typeof source == 'object' && source !== null) {
@@ -31,7 +35,8 @@ function clone(source) {
             for (var i = 0, len = source.length; i < len; i++) {
                 result[i] = clone(source[i]);
             }
-        } else if (!BUILTIN_OBJECT[Object.prototype.toString.call(source)]) {
+        } else if (!BUILTIN_OBJECT[objToString.call(source)]    // 是否为 dom 对象
+&& !isDom(source)) {
             result = {};
             for (var key in source) {
                 if (source.hasOwnProperty(key)) {
@@ -45,7 +50,9 @@ function clone(source) {
 }
 function mergeItem(target, source, key, overwrite) {
     if (source.hasOwnProperty(key)) {
-        if (typeof target[key] == 'object' && !BUILTIN_OBJECT[Object.prototype.toString.call(target[key])]) {
+        var targetProp = target[key];
+        if (typeof targetProp == 'object' && !BUILTIN_OBJECT[objToString.call(targetProp)]    // 是否为 dom 对象
+&& !isDom(targetProp)) {
             // 如果需要递归覆盖，就递归调用merge
             merge(target[key], source[key], overwrite);
         } else if (overwrite || !(key in target)) {
@@ -56,7 +63,7 @@ function mergeItem(target, source, key, overwrite) {
 }
 /**
          * 合并源对象的属性到目标对象
-         * modify from Tangram
+         * @memberOf module:zrender/tool/util
          * @param {*} target 目标对象
          * @param {*} source 源对象
          * @param {boolean} overwrite 是否覆盖
@@ -84,73 +91,10 @@ function getContext() {
     }
     return _ctx;
 }
-var _canvas;
-var _pixelCtx;
-var _width;
-var _height;
-var _offsetX = 0;
-var _offsetY = 0;
 /**
-         * 获取像素拾取专用的上下文
-         * @return {Object} 上下文
-         */
-function getPixelContext() {
-    if (!_pixelCtx) {
-        _canvas = document.createElement('canvas');
-        _width = _canvas.width;
-        _height = _canvas.height;
-        _pixelCtx = _canvas.getContext('2d');
-    }
-    return _pixelCtx;
-}
-/**
-         * 如果坐标处在_canvas外部，改变_canvas的大小
-         * @param {number} x : 横坐标
-         * @param {number} y : 纵坐标
-         * 注意 修改canvas的大小 需要重新设置translate
-         */
-function adjustCanvasSize(x, y) {
-    // 每次加的长度
-    var _v = 100;
-    var _flag;
-    if (x + _offsetX > _width) {
-        _width = x + _offsetX + _v;
-        _canvas.width = _width;
-        _flag = true;
-    }
-    if (y + _offsetY > _height) {
-        _height = y + _offsetY + _v;
-        _canvas.height = _height;
-        _flag = true;
-    }
-    if (x < -_offsetX) {
-        _offsetX = Math.ceil(-x / _v) * _v;
-        _width += _offsetX;
-        _canvas.width = _width;
-        _flag = true;
-    }
-    if (y < -_offsetY) {
-        _offsetY = Math.ceil(-y / _v) * _v;
-        _height += _offsetY;
-        _canvas.height = _height;
-        _flag = true;
-    }
-    if (_flag) {
-        _pixelCtx.translate(_offsetX, _offsetY);
-    }
-}
-/**
-         * 获取像素canvas的偏移量
-         * @return {Object} 偏移量
-         */
-function getPixelOffset() {
-    return {
-        x: _offsetX,
-        y: _offsetY
-    };
-}
-/**
-         * 查询数组中元素的index
+         * @memberOf module:zrender/tool/util
+         * @param {Array} array
+         * @param {*} value
          */
 function indexOf(array, value) {
     if (array.indexOf) {
@@ -165,7 +109,7 @@ function indexOf(array, value) {
 }
 /**
          * 构造类继承关系
-         * 
+         * @memberOf module:zrender/tool/util
          * @param {Function} clazz 源类
          * @param {Function} baseClazz 基类
          */
@@ -180,13 +124,90 @@ function inherits(clazz, baseClazz) {
     }
     clazz.constructor = clazz;
 }
+/**
+         * 数组或对象遍历
+         * @memberOf module:zrender/tool/util
+         * @param {Object|Array} obj
+         * @param {Function} cb
+         * @param {*} [context]
+         */
+function each(obj, cb, context) {
+    if (!(obj && cb)) {
+        return;
+    }
+    if (obj.forEach && obj.forEach === nativeForEach) {
+        obj.forEach(cb, context);
+    } else if (obj.length === +obj.length) {
+        for (var i = 0, len = obj.length; i < len; i++) {
+            cb.call(context, obj[i], i, obj);
+        }
+    } else {
+        for (var key in obj) {
+            if (obj.hasOwnProperty(key)) {
+                cb.call(context, obj[key], key, obj);
+            }
+        }
+    }
+}
+/**
+         * 数组映射
+         * @memberOf module:zrender/tool/util
+         * @param {Array} obj
+         * @param {Function} cb
+         * @param {*} [context]
+         * @return {Array}
+         */
+function map(obj, cb, context) {
+    if (!(obj && cb)) {
+        return;
+    }
+    if (obj.map && obj.map === nativeMap) {
+        return obj.map(cb, context);
+    } else {
+        var result = [];
+        for (var i = 0, len = obj.length; i < len; i++) {
+            result.push(cb.call(context, obj[i], i, obj));
+        }
+        return result;
+    }
+}
+/**
+         * 数组过滤
+         * @memberOf module:zrender/tool/util
+         * @param {Array} obj
+         * @param {Function} cb
+         * @param {*} [context]
+         * @return {Array}
+         */
+function filter(obj, cb, context) {
+    if (!(obj && cb)) {
+        return;
+    }
+    if (obj.filter && obj.filter === nativeFilter) {
+        return obj.filter(cb, context);
+    } else {
+        var result = [];
+        for (var i = 0, len = obj.length; i < len; i++) {
+            if (cb.call(context, obj[i], i, obj)) {
+                result.push(obj[i]);
+            }
+        }
+        return result;
+    }
+}
+function bind(func, context) {
+    return function () {
+        func.apply(context, arguments);
+    };
+}
 module.exports = {
     inherits: inherits,
     clone: clone,
     merge: merge,
     getContext: getContext,
-    getPixelContext: getPixelContext,
-    getPixelOffset: getPixelOffset,
-    adjustCanvasSize: adjustCanvasSize,
-    indexOf: indexOf
+    indexOf: indexOf,
+    each: each,
+    map: map,
+    filter: filter,
+    bind: bind
 } || module.exports;;

@@ -42,7 +42,7 @@ function isInside(shape, area, x, y) {
     }
     var zoneType = shape.type;
     _ctx = _ctx || util.getContext();
-    // 未实现或不可用时(excanvas不支持)则数学运算，主要是line，brokenLine，ring
+    // 未实现或不可用时(excanvas不支持)则数学运算，主要是line，polyline，ring
     var _mathReturn = _mathMethod(shape, area, x, y);
     if (typeof _mathReturn != 'undefined') {
         return _mathReturn;
@@ -68,8 +68,6 @@ function isInside(shape, area, x, y) {
     }
 }
 /**
-         * 用数学方法判断，三个方法中最快，但是支持的shape少
-         *
          * @param {Object} shape : 图形
          * @param {Object} area ：目标区域
          * @param {number} x ： 横坐标
@@ -90,8 +88,8 @@ function _mathMethod(shape, area, x, y) {
     case 'line':
         return isInsideLine(area.xStart, area.yStart, area.xEnd, area.yEnd, area.lineWidth, x, y);
     // 折线
-    case 'broken-line':
-        return isInsideBrokenLine(area.pointList, area.lineWidth, x, y);
+    case 'polyline':
+        return isInsidePolyline(area.pointList, area.lineWidth, x, y);
     // 圆环
     case 'ring':
         return isInsideRing(area.x, area.y, area.r0, area.r, x, y);
@@ -109,7 +107,7 @@ function _mathMethod(shape, area, x, y) {
         return isInsideSector(area.x, area.y, area.r0, area.r, startAngle, endAngle, !area.clockWise, x, y);
     // 多边形
     case 'path':
-        return isInsidePath(area.pathArray, Math.max(area.lineWidth, 5), area.brushType, x, y);
+        return area.pathArray && isInsidePath(area.pathArray, Math.max(area.lineWidth, 5), area.brushType, x, y);
     case 'polygon':
     case 'star':
     case 'isogon':
@@ -278,7 +276,7 @@ function isInsideArcStroke(cx, cy, r, startAngle, endAngle, anticlockwise, lineW
     }
     return angle >= startAngle && angle <= endAngle || angle + PI2 >= startAngle && angle + PI2 <= endAngle;
 }
-function isInsideBrokenLine(points, lineWidth, x, y) {
+function isInsidePolyline(points, lineWidth, x, y) {
     var lineWidth = Math.max(lineWidth, 10);
     for (var i = 0, l = points.length - 1; i < l; i++) {
         var x0 = points[i][0];
@@ -422,7 +420,7 @@ function windingQuadratic(x0, y0, x1, y1, x2, y2, x, y) {
             var y_ = curve.quadraticAt(y0, y1, y2, t);
             for (var i = 0; i < nRoots; i++) {
                 var x_ = curve.quadraticAt(x0, x1, x2, roots[i]);
-                if (x_ > x) {
+                if (x_ < x) {
                     continue;
                 }
                 if (roots[i] < t) {
@@ -434,7 +432,7 @@ function windingQuadratic(x0, y0, x1, y1, x2, y2, x, y) {
             return w;
         } else {
             var x_ = curve.quadraticAt(x0, x1, x2, roots[0]);
-            if (x_ > x) {
+            if (x_ < x) {
                 return 0;
             }
             return y2 < y0 ? 1 : -1;
@@ -690,7 +688,7 @@ module.exports = {
     isInsideCircle: isInsideCircle,
     isInsideLine: isInsideLine,
     isInsideRect: isInsideRect,
-    isInsideBrokenLine: isInsideBrokenLine,
+    isInsidePolyline: isInsidePolyline,
     isInsideCubicStroke: isInsideCubicStroke,
     isInsideQuadraticStroke: isInsideQuadraticStroke
 } || module.exports;;

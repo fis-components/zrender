@@ -116,6 +116,14 @@ var extremity = vec2.create();
          * @param {Array.<number>} max
          */
 var computeArcBoundingBox = function (x, y, r, startAngle, endAngle, anticlockwise, min, max) {
+    if (Math.abs(startAngle - endAngle) >= Math.PI * 2) {
+        // Is a circle
+        min[0] = x - r;
+        min[1] = y - r;
+        max[0] = x + r;
+        max[1] = y + r;
+        return;
+    }
     start[0] = Math.cos(startAngle) * r + x;
     start[1] = Math.sin(startAngle) * r + y;
     end[0] = Math.cos(endAngle) * r + x;

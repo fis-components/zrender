@@ -109,7 +109,9 @@ Group.prototype.addChild = function (child) {
 // TODO Type Check
 Group.prototype.removeChild = function (child) {
     var idx = util.indexOf(this._children, child);
-    this._children.splice(idx, 1);
+    if (idx >= 0) {
+        this._children.splice(idx, 1);
+    }
     child.parent = null;
     if (this._storage) {
         this._storage.delFromMap(child.id);
@@ -117,6 +119,21 @@ Group.prototype.removeChild = function (child) {
             child.delChildrenFromStorage(this._storage);
         }
     }
+};
+/**
+     * 移除所有子节点
+     */
+Group.prototype.clearChildren = function () {
+    for (var i = 0; i < this._children.length; i++) {
+        var child = this._children[i];
+        if (this._storage) {
+            this._storage.delFromMap(child.id);
+            if (child instanceof Group) {
+                child.delChildrenFromStorage(this._storage);
+            }
+        }
+    }
+    this._children.length = 0;
 };
 /**
      * 遍历所有子节点
@@ -157,7 +174,7 @@ Group.prototype.addChildrenToStorage = function (storage) {
     for (var i = 0; i < this._children.length; i++) {
         var child = this._children[i];
         storage.addToMap(child);
-        if (child.type === 'group') {
+        if (child instanceof Group) {
             child.addChildrenToStorage(storage);
         }
     }
@@ -166,7 +183,7 @@ Group.prototype.delChildrenFromStorage = function (storage) {
     for (var i = 0; i < this._children.length; i++) {
         var child = this._children[i];
         storage.delFromMap(child.id);
-        if (child.type === 'group') {
+        if (child instanceof Group) {
             child.delChildrenFromStorage(storage);
         }
     }
