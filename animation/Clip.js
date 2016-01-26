@@ -9,41 +9,47 @@
  * @config easing(optional)
  * @config ondestroy(optional)
  * @config onrestart(optional)
+ *
+ * TODO pause
  */
 
 
-var Easing = require('./easing');
+var easingFuncs = require('./easing');
 function Clip(options) {
-    this._targetPool = options.target || {};
-    if (!(this._targetPool instanceof Array)) {
-        this._targetPool = [this._targetPool];
-    }
+    this._target = options.target;
     // 生命周期
     this._life = options.life || 1000;
     // 延时
     this._delay = options.delay || 0;
     // 开始时间
-    this._startTime = new Date().getTime() + this._delay;
-    // 单位毫秒
-    // 结束时间
-    this._endTime = this._startTime + this._life * 1000;
+    // this._startTime = new Date().getTime() + this._delay;// 单位毫秒
+    this._initialized = false;
     // 是否循环
-    this.loop = typeof options.loop == 'undefined' ? false : options.loop;
+    this.loop = options.loop == null ? false : options.loop;
     this.gap = options.gap || 0;
     this.easing = options.easing || 'Linear';
     this.onframe = options.onframe;
     this.ondestroy = options.ondestroy;
     this.onrestart = options.onrestart;
 }
+;
 Clip.prototype = {
+    constructor: Clip,
     step: function (time) {
+        // Set startTime on first step, or _startTime may has milleseconds different between clips
+        // PENDING
+        if (!this._initialized) {
+            this._startTime = new Date().getTime() + this._delay;
+            this._initialized = true;
+        }
         var percent = (time - this._startTime) / this._life;
         // 还没开始
         if (percent < 0) {
             return;
         }
         percent = Math.min(percent, 1);
-        var easingFunc = typeof this.easing == 'string' ? Easing[this.easing] : this.easing;
+        var easing = this.easing;
+        var easingFunc = typeof easing == 'string' ? easingFuncs[easing] : easing;
         var schedule = typeof easingFunc === 'function' ? easingFunc(percent) : percent;
         this.fire('frame', schedule);
         // 结束
@@ -56,7 +62,7 @@ Clip.prototype = {
             }
             // 动画完成将这个控制器标识为待删除
             // 在Animation.update中进行批量删除
-            this.__needsRemove = true;
+            this._needsRemove = true;
             return 'destroy';
         }
         return null;
@@ -65,15 +71,13 @@ Clip.prototype = {
         var time = new Date().getTime();
         var remainder = (time - this._startTime) % this._life;
         this._startTime = new Date().getTime() - remainder + this.gap;
-        this.__needsRemove = false;
+        this._needsRemove = false;
     },
     fire: function (eventType, arg) {
-        for (var i = 0, len = this._targetPool.length; i < len; i++) {
-            if (this['on' + eventType]) {
-                this['on' + eventType](this._targetPool[i], arg);
-            }
+        eventType = 'on' + eventType;
+        if (this[eventType]) {
+            this[eventType](this._target, arg);
         }
-    },
-    constructor: Clip
+    }
 };
 module.exports = Clip || module.exports;;
