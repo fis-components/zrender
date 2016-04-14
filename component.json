@@ -5,7 +5,7 @@
     "name": "zrender",
     "main": "lib/zrender.js",
     "umd2commonjs": null,
-    "version": "3.0.4",
+    "version": "3.0.5",
     "description": "A lightweight canvas library.",
     "tag": "master",
     "reposType": "npm",
