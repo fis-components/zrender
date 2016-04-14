@@ -1,0 +1,13 @@
+{
+    "protocol": null,
+    "github": null,
+    "repos": "https://github.com/ecomfe/zrender.git",
+    "name": "zrender",
+    "main": "lib/zrender.js",
+    "umd2commonjs": null,
+    "version": "3.0.7",
+    "description": "A lightweight canvas library.",
+    "tag": "master",
+    "reposType": "npm",
+    "dependencies": {}
+}
